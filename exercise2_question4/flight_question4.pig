@@ -1,0 +1,13 @@
+flight_data = LOAD 's3://assignment1/exercise2.csv' USING PigStorage(',') AS (Year:int, Month:int, DayofMonth:int, DayOfWeek:int, DepTime:int, CRSDepTime:int, ArrTime:int, CRSArrTime:int, UniqueCarrier:chararray, FlightNum:int, TailNum:chararray, ActualElapsedTime:int, CRSElapsedTime:int, AirTime:chararray, ArrDelay:int, DepDelay:int, Origin:chararray, Dest:chararray, Distance:int, TaxiIn:chararray, TaxiOut:chararray, Cancelled:int, CancellationCode:chararray, Diverted:int, CarrierDelay:chararray, WeatherDelay:chararray, NASDelay:chararray, SecurityDelay:chararray, LateAircraftDelay:chararray);
+carrier_data = LOAD 's3://assignment1/carriers.csv' USING PigStorage(',') AS (Code:chararray, Description:chararray);
+flight_filter = FILTER flight_data BY UniqueCarrier != 'UniqueCarrier';
+carrier_filter = FILTER carrier_data BY Code != 'Code';
+result_group = GROUP flight_filter BY UniqueCarrier;
+result_count = FOREACH result_group GENERATE group, COUNT(flight_filter) as count_car;
+result_order = ORDER result_count BY count_car DESC;
+result_top_ten = LIMIT result_order 10;
+carrier_result = FOREACH carrier_filter GENERATE REPLACE(Code,'\\"', '') as carrier_code, REPLACE(Description,'\\"', '') as carrier_name;
+result = JOIN result_top_ten BY group, carrier_result BY carrier_code;
+order_result = ORDER result BY result_top_ten::count_car DESC;
+result_output = FOREACH order_result GENERATE carrier_result::carrier_name;
+STORE result_output INTO 's3://assignment1/flight_question4';

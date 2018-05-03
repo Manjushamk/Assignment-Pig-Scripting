@@ -1,0 +1,14 @@
+flight_data = LOAD 's3://assignment1/exercise2.csv' USING PigStorage(',') AS (Year:int, Month:int, DayofMonth:int, DayOfWeek:int, DepTime:int, CRSDepTime:int, ArrTime:int, CRSArrTime:int, UniqueCarrier:chararray, FlightNum:int, TailNum:chararray, ActualElapsedTime:int, CRSElapsedTime:int, AirTime:chararray, ArrDelay:int, DepDelay:int, Origin:chararray, Dest:chararray, Distance:int, TaxiIn:chararray, TaxiOut:chararray, Cancelled:int, CancellationCode:chararray, Diverted:int, CarrierDelay:chararray, WeatherDelay:chararray, NASDelay:chararray, SecurityDelay:chararray, LateAircraftDelay:chararray);
+flight_filter = FILTER flight_data BY UniqueCarrier != 'UniqueCarrier';
+airports_data = LOAD 's3://assignment1/airports.csv' USING PigStorage(',') AS (iata:chararray, airport:chararray, city:chararray, state:chararray, country:chararray, lat:float, long:float);
+airports_filter = FILTER airports_data BY iata != 'iata';
+select_airports = FOREACH flight_filter GENERATE Dest as Inbound_airport;
+group_airports = GROUP select_airports BY Inbound_airport;
+count_traffic = FOREACH group_airports GENERATE group, COUNT(select_airports.Inbound_airport) AS inbound_traffic;
+traffic_order = ORDER count_traffic BY inbound_traffic DESC;
+traffic_top3 = LIMIT traffic_order 3;
+airports_result = FOREACH airports_filter GENERATE REPLACE(iata,'\\"', '') as airport_code, REPLACE(airport,'\\"', '') as airport_name;
+result = JOIN airports_result BY airport_code,traffic_top3 BY group;
+order_result = ORDER result BY traffic_top3::inbound_traffic DESC;
+result_output = FOREACH order_result GENERATE airports_result::airport_name as AirportName;
+STORE result_output INTO 's3://assignment1/flight_question5';
